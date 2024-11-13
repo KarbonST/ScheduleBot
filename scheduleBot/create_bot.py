@@ -11,7 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import _mysql_connector
 
 # Инициализация объекта AsyncIOScheduler для планирования и выполнения задач по времени
-scheduler = AsyncIOScheduler(timezone = 'Europe/Moscow')
+scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
 
 # Настройка администраторов
 admins = [int(admin_id) for admin_id in config('ADMINS').split(',')]
