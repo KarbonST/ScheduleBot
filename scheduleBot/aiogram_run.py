@@ -1,4 +1,7 @@
 import asyncio
+
+from aiogram import types
+
 from create_bot import bot, dp, scheduler
 from handlers.start import start_router
 
