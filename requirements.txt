@@ -1,7 +1,7 @@
 aiogram~=3.14.0
 python-decouple
 APScheduler~=3.10.4
-mysql-connector-python
+aiomysql
 
-pip~=23.2.1
+pip~=23.3
 attrs~=24.2.0

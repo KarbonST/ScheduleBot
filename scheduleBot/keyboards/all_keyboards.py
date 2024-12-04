@@ -5,7 +5,7 @@ from scheduleBot.create_bot import admins
 # Клавиатура "Главное меню"
 def main_kb(user_telegram_id: int):
     kb_list = [
-        [KeyboardButton(text="📖О нас📖"), KeyboardButton(text="👤Профиль👤")],
+        [KeyboardButton(text="📖О нас📖"), KeyboardButton(text="👤Стереть данные поиска👤")],
         [KeyboardButton(text="📚Перейти к расписанию📚")]
     ]
     if user_telegram_id in admins:
