@@ -2,6 +2,9 @@ aiogram~=3.14.0
 python-decouple
 APScheduler~=3.10.4
 aiomysql
+redis
+python-dotenv
+cryptography
 
 pip~=23.3
 attrs~=24.2.0
