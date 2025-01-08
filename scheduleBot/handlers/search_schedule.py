@@ -32,8 +32,8 @@ class SearchInfo(StatesGroup):
     auditorium_name = State()
     auditorium_id = State()
 
-
-
+    # Состояние для удаления данных
+    delete_data = State()
 """
     Функции для обработки группы
 """
