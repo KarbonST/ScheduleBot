@@ -6,7 +6,7 @@ from scheduleBot.create_bot import bot, scheduler, dp
 from scheduleBot.handlers.back_to_main_menu import back_to_menu_router
 from scheduleBot.handlers.start import start_router
 from scheduleBot.handlers.switching_to_the_schedule import switch_router
-from scheduleBot.handlers.search_schedule import search_router, choice_router
+from scheduleBot.handlers.search_schedule import search_router, choice_router, date_router
 from scheduleBot.utils import set_schedule_pool
 
 # Создание пула подключений для MySQL
@@ -32,6 +32,7 @@ async def main():
     dp.include_router(switch_router)
     dp.include_router(search_router)
     dp.include_router(choice_router)
+    dp.include_router(date_router)
     dp.include_router(back_to_menu_router)
     scheduler.start()
     await bot.delete_webhook(drop_pending_updates=True)
