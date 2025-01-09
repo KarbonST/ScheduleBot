@@ -60,9 +60,9 @@ async def schedule_for_group_from_fsm(message: Message, state: FSMContext):
     group_name = data['group_name']
     group_id = data['group_id']
     if group:
+        await state.set_state(SearchInfo.group_id)
         await message.answer(f"На какой день вы хотите найти расписание?",
                              reply_markup=duration_choice_kb(message.from_user.id))
-        await state.set_state(SearchInfo.group_id)
     else:
         await message.answer("Не удалось найти сохранённую группу. Напишите её заново.")
 
@@ -104,7 +104,7 @@ async def fetch_group_schedule(msg: Message, state: FSMContext):
     schedule_date = datetime.date.today().strftime("%d.%m.%Y") if msg.text == "1️⃣Сегодня1️⃣" else (datetime.date.today() + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
 
     if group_id:
-        schedule = await find_schedule_for_day(group_id, date_filter)
+        schedule = await find_schedule_for_day(participant_id=group_id, date_filter=date_filter)
         if schedule:
             schedule_text = "\n\n".join(
                 f"📚 {item['subject_name']} ({item['event_kind']})\n"
@@ -134,7 +134,7 @@ async def fetch_group_schedule_week(msg: Message, state: FSMContext):
         return
 
     # Вызываем функцию, которая вернёт расписание (список занятий за неделю)
-    schedule = await find_schedule_for_week(group_id, date_filter)
+    schedule = await find_schedule_for_week(participant_id = group_id, date_filter = date_filter)
 
     if not schedule:
         await msg.answer("Расписание на выбранную неделю не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
@@ -208,6 +208,7 @@ async def schedule_for_teacher_from_fsm(message: Message, state: FSMContext):
     teacher_name = data['teacher_name']
     teacher_id = data['teacher_id']
     if group:
+        await state.set_state(SearchInfo.teacher_id)
         await message.answer(f"На какой день вы хотите найти расписание?",
                              reply_markup=duration_choice_kb(message.from_user.id))
     else:
@@ -250,7 +251,7 @@ async def fetch_teacher_schedule(msg: Message, state: FSMContext):
     schedule_date = datetime.date.today().strftime("%d.%m.%Y") if msg.text == "1️⃣Сегодня1️⃣" else (datetime.date.today() + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
 
     if teacher_id:
-        schedule = await find_schedule_for_day(teacher_id, date_filter)
+        schedule = await find_schedule_for_day(participant_id=teacher_id, date_filter=date_filter)
         if schedule:
             schedule_text = "\n\n".join(
                 f"📚 {item['subject_name']} ({item['event_kind']})\n"
@@ -279,7 +280,7 @@ async def fetch_teacher_schedule_week(msg: Message, state: FSMContext):
         return
 
     # Вызываем функцию, которая вернёт расписание (список занятий за неделю)
-    schedule = await find_schedule_for_week(teacher_id, date_filter)
+    schedule = await find_schedule_for_week(participant_id = teacher_id, date_filter = date_filter)
 
     if not schedule:
         await msg.answer("Расписание на выбранную неделю не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
@@ -339,7 +340,7 @@ async def search_auditorium(message: Message, state: FSMContext):
             reply_markup=yes_no_kb(message.from_user.id)
         )
     else:
-        await state.set_state(SearchInfo.teacher_name)
+        await state.set_state(SearchInfo.auditorium_name)
         await message.answer("Напишите номер аудитории (например, В903)")
 
 # Пользователь соглашается использовать ранее введённую аудиторию
@@ -349,6 +350,7 @@ async def schedule_for_auditorium_from_fsm(message: Message, state: FSMContext):
     auditorium_name = data['auditorium_name']
     auditorium_id = data['auditorium_id']
     if group:
+        await state.set_state(SearchInfo.auditorium_id)
         await message.answer(f"На какой день вы хотите найти расписание?",
                              reply_markup=duration_choice_kb(message.from_user.id))
     else:
@@ -390,7 +392,7 @@ async def fetch_teacher_schedule(msg: Message, state: FSMContext):
     schedule_date = datetime.date.today().strftime("%d.%m.%Y") if msg.text == "1️⃣Сегодня1️⃣" else (datetime.date.today() + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
 
     if auditorium_id:
-        schedule = await find_schedule_for_day(auditorium_id, date_filter)
+        schedule = await find_schedule_for_day(place_id=auditorium_id, date_filter=date_filter)
         if schedule:
             schedule_text = "\n\n".join(
                 f"📚 {item['subject_name']} ({item['event_kind']})\n"
@@ -419,7 +421,7 @@ async def fetch_teacher_schedule_week(msg: Message, state: FSMContext):
         return
 
     # Вызываем функцию, которая вернёт расписание (список занятий за неделю)
-    schedule = await find_schedule_for_week(auditorium_id, date_filter)
+    schedule = await find_schedule_for_week(place_id = auditorium_id, date_filter = date_filter)
 
     if not schedule:
         await msg.answer("Расписание на выбранную неделю не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))

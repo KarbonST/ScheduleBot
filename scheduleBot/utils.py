@@ -12,16 +12,29 @@ def get_schedule_pool():
     return schedule_pool
 
 
-# Поиск расписания на сегодня или завтра
-async def find_schedule_for_day(participant_id: str, date_filter: str) -> List[Dict]:
+import datetime
+from typing import List, Dict, Optional
+
+
+# from your_db_module import get_schedule_pool
+
+async def find_schedule_for_day(
+        participant_id: Optional[str] = None,
+        place_id: Optional[str] = None,
+        date_filter: str = "today"
+) -> List[Dict]:
     """
-    Поиск расписания для участника (группы, преподавателя) или аудитории.
+    Поиск расписания:
+    1) Для участника (группы, преподавателя), если передан participant_id,
+    2) Или для аудитории, если передан place_id.
 
     :param participant_id: UUID участника (группа или преподаватель)
-    :param date_filter: Фильтр даты (например, 'today' или 'tomorrow')
+    :param place_id: UUID аудитории (из таблицы event_places.idnumber),
+                     если ищем расписание по аудитории.
+    :param date_filter: 'today' или 'tomorrow'
     :return: Список расписания (список словарей)
     """
-    # Определяем дату для фильтра
+    # 1. Определяем дату для фильтра
     today = datetime.date.today()
     if date_filter == "today":
         target_date = today
@@ -30,18 +43,37 @@ async def find_schedule_for_day(participant_id: str, date_filter: str) -> List[D
     else:
         raise ValueError("Invalid date_filter. Use 'today' or 'tomorrow'.")
 
-    # Приводим дату в строковый формат для MySQL
+    # 2. Приводим дату в строковый формат
     target_date_str = target_date.strftime("%Y-%m-%d")
 
-    # Формируем запрос
-    # Обратите внимание, что в WHERE мы используем:
-    #   JSON_CONTAINS(e.data, JSON_QUOTE(%s), '$.participants')
-    # чтобы искать participant_id в массиве participants
-    query = """
+    # 3. Строим WHERE-часть динамически, в зависимости от того,
+    #    ищем ли мы по participant_id или place_id (или сразу по обоим).
+    where_clauses = []
+    params = []
+
+    # Если нужен поиск по участнику
+    if participant_id is not None:
+        where_clauses.append("JSON_CONTAINS(e.data->>'$.participants', JSON_QUOTE(%s))")
+        params.append(participant_id)
+
+    # Если нужен поиск по аудитории
+    if place_id is not None:
+        where_clauses.append("JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.place_id')) = %s")
+        params.append(place_id)
+
+    # Фильтр по дате
+    where_clauses.append("JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date')) = %s")
+    params.append(target_date_str)
+
+    # Объединяем все условия (AND между ними)
+    where_condition = " AND ".join(where_clauses)
+
+    # 4. Сам запрос
+    query = f"""
         SELECT 
             e.idnumber AS event_id,
-            JSON_UNQUOTE(JSON_EXTRACT(s.data, '$.name')) AS subject_name,
-            JSON_UNQUOTE(JSON_EXTRACT(ek.data, '$.name')) AS event_kind,
+            JSON_UNQUOTE(JSON_EXTRACT(s.data, '$.name'))       AS subject_name,
+            JSON_UNQUOTE(JSON_EXTRACT(ek.data, '$.name'))      AS event_kind,
             JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.start_time')) AS start_time,
             JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.end_time'))   AS end_time,
             JSON_UNQUOTE(JSON_EXTRACT(pl.data, '$.room'))       AS room,
@@ -56,80 +88,104 @@ async def find_schedule_for_day(participant_id: str, date_filter: str) -> List[D
             JOIN subjects s 
                 ON JSON_UNQUOTE(JSON_EXTRACT(e.data, '$.subject_id')) = s.idnumber
             JOIN event_kinds ek 
-                ON JSON_UNQUOTE(JSON_EXTRACT(e.data, '$.kind_id')) = ek.idnumber
+                ON JSON_UNQUOTE(JSON_EXTRACT(e.data, '$.kind_id'))   = ek.idnumber
         WHERE 
-            JSON_CONTAINS(e.data->>'$.participants', JSON_QUOTE(%s))
-            AND JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date')) = %s
+            {where_condition}
         ORDER BY
             JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.start_time'));
     """
 
-    # Выполняем запрос с помощью пула соединений
+    # 5. Выполняем запрос
     async with get_schedule_pool().acquire() as conn:
         async with conn.cursor() as cursor:
-            await cursor.execute(query, (participant_id, target_date_str))
+            await cursor.execute(query, params)
             rows = await cursor.fetchall()
 
-    # Преобразуем результат в список словарей
+    # 6. Преобразуем результат в список словарей
     schedule = []
     for row in rows:
         schedule.append({
-            "event_id":      row[0],
-            "subject_name":  row[1],
-            "event_kind":    row[2],
-            "start_time":    row[3],
-            "end_time":      row[4],
-            "room":          row[5],
-            "date":          row[6],
+            "event_id": row[0],
+            "subject_name": row[1],
+            "event_kind": row[2],
+            "start_time": row[3],
+            "end_time": row[4],
+            "room": row[5],
+            "date": row[6],
         })
 
     return schedule
 
-# Поиск расписания на эту или следующую неделю
-async def find_schedule_for_week(participant_id: str, date_filter: str) -> List[Dict]:
-    """
-    Поиск расписания для участника (группы, преподавателя) или аудитории
-    на неделю (с понедельника по субботу текущей недели).
 
-    :param date_filter: Эта неделя или следующая
-    :param participant_id: UUID участника (группа или преподаватель)
-    :return: Список расписания (список словарей) за неделю
+import datetime
+from typing import List, Dict, Optional
+
+
+# from your_db_module import get_schedule_pool
+
+async def find_schedule_for_week(
+        date_filter: str,
+        participant_id: Optional[str] = None,
+        place_id: Optional[str] = None
+) -> List[Dict]:
     """
+    Поиск расписания на неделю (с понедельника по субботу) для:
+      - Участника (группа или преподаватель), если задан participant_id,
+      - Или аудитории, если задан place_id,
+      - Или и того, и другого одновременно, если заданы оба.
+
+    :param date_filter: 'this_week' или 'next_week'
+    :param participant_id: UUID участника (группы или преподавателя)
+    :param place_id: UUID аудитории (из таблицы event_places.idnumber)
+    :return: Список занятий (словарей) за заданный период.
+    """
+
+    # 1. Определяем границы недели (понедельник–суббота)
     today = datetime.date.today()
-    # Находим понедельник текущей недели
-    # weekday(): Понедельник = 0, ... , Воскресенье = 6
-    monday = today - datetime.timedelta(days=today.weekday())
-    # Суббота = понедельник + 5 дней
+    monday = today - datetime.timedelta(days=today.weekday())  # weekday(): Пн=0, Вс=6
     saturday = monday + datetime.timedelta(days=5)
 
-    today = datetime.date.today()
-    # Находим понедельник «текущей» недели
-    # weekday(): Понедельник = 0, ..., Воскресенье = 6
-    monday = today - datetime.timedelta(days=today.weekday())
-    # Суббота = понедельник + 5 дней
-    saturday = monday + datetime.timedelta(days=5)
-
-    # Если нужно следующую неделю — сдвигаем на 7 дней вперёд
     if date_filter == "next_week":
         monday += datetime.timedelta(weeks=1)
         saturday += datetime.timedelta(weeks=1)
     elif date_filter != "this_week":
         raise ValueError("Invalid date_filter. Use 'this_week' or 'next_week'.")
 
-    # Приводим даты в строковый формат YYYY-MM-DD для MySQL
     monday_str = monday.strftime("%Y-%m-%d")
     saturday_str = saturday.strftime("%Y-%m-%d")
 
-    # Сформируем запрос на период (BETWEEN monday AND saturday)
-    query = """
-        SELECT 
+    # 2. Динамически формируем WHERE‑условия
+    where_clauses = []
+    params = []
+
+    # Если ищем по участнику
+    if participant_id is not None:
+        where_clauses.append("JSON_CONTAINS(e.data->>'$.participants', JSON_QUOTE(%s))")
+        params.append(participant_id)
+
+    # Если ищем по аудитории
+    if place_id is not None:
+        where_clauses.append("JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.place_id')) = %s")
+        params.append(place_id)
+
+    # Добавляем условие по диапазону дат
+    where_clauses.append("JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date')) BETWEEN %s AND %s")
+    params.append(monday_str)
+    params.append(saturday_str)
+
+    # Склеиваем условия через AND
+    where_condition = " AND ".join(where_clauses)
+
+    # 3. Составляем запрос
+    query = f"""
+        SELECT
             e.idnumber AS event_id,
-            JSON_UNQUOTE(JSON_EXTRACT(s.data, '$.name'))    AS subject_name,
-            JSON_UNQUOTE(JSON_EXTRACT(ek.data, '$.name'))   AS event_kind,
-            JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.start_time')) AS start_time,
-            JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.end_time'))   AS end_time,
-            JSON_UNQUOTE(JSON_EXTRACT(pl.data, '$.room'))       AS room,
-            JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date'))       AS date
+            JSON_UNQUOTE(JSON_EXTRACT(s.data, '$.name'))         AS subject_name,
+            JSON_UNQUOTE(JSON_EXTRACT(ek.data, '$.name'))        AS event_kind,
+            JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.start_time'))  AS start_time,
+            JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.end_time'))    AS end_time,
+            JSON_UNQUOTE(JSON_EXTRACT(pl.data, '$.room'))        AS room,
+            JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date'))        AS date
         FROM events e
             JOIN holding_info hi
                 ON JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.event_id')) = e.idnumber
@@ -141,33 +197,34 @@ async def find_schedule_for_week(participant_id: str, date_filter: str) -> List[
                 ON JSON_UNQUOTE(JSON_EXTRACT(e.data, '$.subject_id')) = s.idnumber
             JOIN event_kinds ek
                 ON JSON_UNQUOTE(JSON_EXTRACT(e.data, '$.kind_id'))   = ek.idnumber
-        WHERE 
-            JSON_CONTAINS(e.data->>'$.participants', JSON_QUOTE(%s))
-            AND JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date')) BETWEEN %s AND %s
+        WHERE
+            {where_condition}
         ORDER BY
             JSON_UNQUOTE(JSON_EXTRACT(hi.data, '$.date')),
             JSON_UNQUOTE(JSON_EXTRACT(tp.data, '$.start_time'));
     """
 
+    # 4. Выполняем запрос
     async with get_schedule_pool().acquire() as conn:
         async with conn.cursor() as cursor:
-            # Передаем параметр participant_id, затем monday_str, saturday_str
-            await cursor.execute(query, (participant_id, monday_str, saturday_str))
+            await cursor.execute(query, params)
             rows = await cursor.fetchall()
 
+    # 5. Преобразуем результат в список словарей
     schedule = []
     for row in rows:
         schedule.append({
-            "event_id":      row[0],
-            "subject_name":  row[1],
-            "event_kind":    row[2],
-            "start_time":    row[3],
-            "end_time":      row[4],
-            "room":          row[5],
-            "date":          row[6],
+            "event_id": row[0],
+            "subject_name": row[1],
+            "event_kind": row[2],
+            "start_time": row[3],
+            "end_time": row[4],
+            "room": row[5],
+            "date": row[6],
         })
 
     return schedule
+
 
 # Функция для поиска группы в MySQL
 async def find_group_in_db(group_name: str):
@@ -213,8 +270,8 @@ async def find_teacher_in_db(teacher_name: str):
 async def find_auditorium_in_db(auditorium_name: str):
     query = """
     SELECT idnumber
-    FROM event_participants
-    WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.name')) = %s;
+    FROM event_places
+    WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.room')) = %s;
     """
 
     # Подключение к пулу MySQL
