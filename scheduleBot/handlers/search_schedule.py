@@ -114,7 +114,7 @@ async def fetch_group_schedule(msg: Message, state: FSMContext):
             )
             await msg.answer(f"Расписание группы {group_name} на {schedule_date}:\n\n{schedule_text}", reply_markup=duration_choice_kb(msg.from_user.id))
         else:
-            await msg.answer("Расписание на выбранный день не найдено.")
+            await msg.answer("Расписание на выбранный день не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
     else:
         await msg.answer("ID группы не найден. Повторите поиск.")
 
@@ -137,7 +137,7 @@ async def fetch_group_schedule_week(msg: Message, state: FSMContext):
     schedule = await find_schedule_for_week(group_id, date_filter)
 
     if not schedule:
-        await msg.answer("Расписание на выбранную неделю не найдено.")
+        await msg.answer("Расписание на выбранную неделю не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
         return
 
     from collections import defaultdict
@@ -260,7 +260,7 @@ async def fetch_teacher_schedule(msg: Message, state: FSMContext):
             )
             await msg.answer(f"Расписание преподавателя {teacher_name} на {schedule_date}:\n\n{schedule_text}", reply_markup=duration_choice_kb(msg.from_user.id))
         else:
-            await msg.answer("Расписание на выбранный день не найдено.")
+            await msg.answer("Расписание на выбранный день не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
     else:
         await msg.answer("ID преподавателя не найден. Повторите поиск.")
 
@@ -282,7 +282,7 @@ async def fetch_teacher_schedule_week(msg: Message, state: FSMContext):
     schedule = await find_schedule_for_week(teacher_id, date_filter)
 
     if not schedule:
-        await msg.answer("Расписание на выбранную неделю не найдено.")
+        await msg.answer("Расписание на выбранную неделю не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
         return
 
     # Группируем занятия по дате
@@ -400,7 +400,7 @@ async def fetch_teacher_schedule(msg: Message, state: FSMContext):
             )
             await msg.answer(f"Расписание аудитории {auditorium_name} на {schedule_date}:\n\n{schedule_text}", reply_markup=duration_choice_kb(msg.from_user.id))
         else:
-            await msg.answer("Расписание на выбранный день не найдено.")
+            await msg.answer("Расписание на выбранный день не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
     else:
         await msg.answer("ID аудитории не найден. Повторите поиск.")
 
@@ -422,7 +422,7 @@ async def fetch_teacher_schedule_week(msg: Message, state: FSMContext):
     schedule = await find_schedule_for_week(auditorium_id, date_filter)
 
     if not schedule:
-        await msg.answer("Расписание на выбранную неделю не найдено.")
+        await msg.answer("Расписание на выбранную неделю не найдено.", reply_markup=duration_choice_kb(msg.from_user.id))
         return
 
     # Группируем занятия по дате
