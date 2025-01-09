@@ -24,9 +24,9 @@ async def delete_data(message: Message, state: FSMContext):
 async def handle_delete_confirmation(message: Message, state: FSMContext):
     if message.text == "✅Да✅":
         # Удаляем данные из FSM
-        await state.update_data(group=None, teacher=None, auditorium=None)
+        #await state.update_data(group=None, teacher=None, auditorium=None)
+        await state.clear()
         await message.answer("Данные поиска успешно удалены!", reply_markup=main_kb(message.from_user.id))
     elif message.text == "❌Нет❌":
         await message.answer("Удаление данных отменено.", reply_markup=main_kb(message.from_user.id))
-    await state.clear()  # Сбрасываем состояние
 

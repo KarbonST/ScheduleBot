@@ -87,6 +87,7 @@ async def handle_group_input(msg: Message, state: FSMContext):
     if group_id:
         await state.update_data(group_name = group_name)
         await state.update_data(group_id = group_id)
+        await state.set_state(SearchInfo.group_id)
         await msg.answer(f"Группа {group_name} найдена!"
                          f" На какой день вы хотите найти расписание?",
                          reply_markup=duration_choice_kb(msg.from_user.id))
@@ -111,7 +112,7 @@ async def fetch_group_schedule(msg: Message, state: FSMContext):
                 f"🏢 {item['room']}\n"
                 for item in schedule
             )
-            await msg.answer(f"Расписание группы {group_name} на {schedule_date}:\n\n{schedule_text}")
+            await msg.answer(f"Расписание группы {group_name} на {schedule_date}:\n\n{schedule_text}", reply_markup=duration_choice_kb(msg.from_user.id))
         else:
             await msg.answer("Расписание на выбранный день не найдено.")
     else:
@@ -177,7 +178,7 @@ async def fetch_group_schedule_week(msg: Message, state: FSMContext):
     # Передаем parse_mode='HTML', чтобы теги <b> отработали
     await msg.answer(
         f"Расписание группы <b>{group_name}</b> на {week_title} (Пн–Сб):\n\n{schedule_text}",
-        parse_mode="HTML"
+        parse_mode="HTML", reply_markup=duration_choice_kb(msg.from_user.id)
     )
 
 
@@ -232,6 +233,7 @@ async def handle_teacher_input(msg: Message, state: FSMContext):
     if teacher_id:
         await state.update_data(teacher_name = teacher_name)
         await state.update_data(teacher_id = teacher_id)
+        await state.set_state(SearchInfo.teacher_id)
         await msg.answer(f"Преподаватель {teacher_name} найден!"
                          f" На какой день вы хотите найти расписание?",
                          reply_markup=duration_choice_kb(msg.from_user.id))
@@ -256,7 +258,7 @@ async def fetch_teacher_schedule(msg: Message, state: FSMContext):
                 f"🏢 {item['room']}\n"
                 for item in schedule
             )
-            await msg.answer(f"Расписание преподавателя {teacher_name} на {schedule_date}:\n\n{schedule_text}")
+            await msg.answer(f"Расписание преподавателя {teacher_name} на {schedule_date}:\n\n{schedule_text}", reply_markup=duration_choice_kb(msg.from_user.id))
         else:
             await msg.answer("Расписание на выбранный день не найдено.")
     else:
@@ -318,7 +320,7 @@ async def fetch_teacher_schedule_week(msg: Message, state: FSMContext):
     # Передаем parse_mode='HTML', чтобы теги <b> отработали
     await msg.answer(
         f"Расписание преподавателя <b>{teacher_name}</b> на {week_title} (Пн–Сб):\n\n{schedule_text}",
-        parse_mode="HTML"
+        parse_mode="HTML", reply_markup=duration_choice_kb(msg.from_user.id)
     )
 
 """
@@ -340,7 +342,7 @@ async def search_auditorium(message: Message, state: FSMContext):
         await state.set_state(SearchInfo.teacher_name)
         await message.answer("Напишите номер аудитории (например, В903)")
 
-# Пользователь соглашается использовать ранее введённую группу
+# Пользователь соглашается использовать ранее введённую аудиторию
 @choice_router.message(F.text == "✅Да✅", SearchInfo.auditorium_name)
 async def schedule_for_auditorium_from_fsm(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -356,6 +358,27 @@ async def schedule_for_auditorium_from_fsm(message: Message, state: FSMContext):
 @choice_router.message(F.text == "❌Нет❌", SearchInfo.auditorium_name)
 async def search_schedule_new_auditorium(message: Message, state: FSMContext):
     await message.answer("Напишите номер аудитории (например, В903")
+
+@choice_router.message(SearchInfo.auditorium_name)
+async def handle_auditorium_input(msg: Message, state: FSMContext):
+    auditorium_name = msg.text
+    # Проверка на возврат в главное меню
+    if auditorium_name == "⏪Вернуться в главное меню⏪":
+        await return_to_main_menu(msg)
+        return
+
+    # Поиск группы в БД
+    auditorium_id = await find_auditorium_in_db(auditorium_name)
+
+    if auditorium_id:
+        await state.update_data(auditorium_name = auditorium_name)
+        await state.update_data(auditorium_id = auditorium_id)
+        await state.set_state(SearchInfo.auditorium_id)
+        await msg.answer(f"Аудитория {auditorium_name} найдена!"
+                         f" На какой день вы хотите найти расписание?",
+                         reply_markup=duration_choice_kb(msg.from_user.id))
+    else:
+        await msg.answer(f"Аудитория {auditorium_name} не найдена в базе данных. Попробуйте снова.")
 
 # Поиск расписания для аудитории на сегодня или завтра
 @date_router.message(F.text.in_(["1️⃣Сегодня1️⃣", "2️⃣Завтра2️⃣"]), SearchInfo.auditorium_id)
@@ -375,7 +398,7 @@ async def fetch_teacher_schedule(msg: Message, state: FSMContext):
                 f"🏢 {item['room']}\n"
                 for item in schedule
             )
-            await msg.answer(f"Расписание аудитории {auditorium_name} на {schedule_date}:\n\n{schedule_text}")
+            await msg.answer(f"Расписание аудитории {auditorium_name} на {schedule_date}:\n\n{schedule_text}", reply_markup=duration_choice_kb(msg.from_user.id))
         else:
             await msg.answer("Расписание на выбранный день не найдено.")
     else:
@@ -437,5 +460,5 @@ async def fetch_teacher_schedule_week(msg: Message, state: FSMContext):
     # Передаем parse_mode='HTML', чтобы теги <b> отработали
     await msg.answer(
         f"Расписание аудитории <b>{auditorium_name}</b> на {week_title} (Пн–Сб):\n\n{schedule_text}",
-        parse_mode="HTML"
+        parse_mode="HTML", reply_markup=duration_choice_kb(msg.from_user.id)
     )

@@ -29,8 +29,8 @@ async def main():
 
     # Добавление роутеров
     dp.include_router(start_router)
-    dp.include_router(switch_router)
     dp.include_router(search_router)
+    dp.include_router(switch_router)
     dp.include_router(choice_router)
     dp.include_router(date_router)
     dp.include_router(back_to_menu_router)
